@@ -3,7 +3,7 @@ using UnityEngine;
 public class SuitWeaponController : MonoBehaviour
 {
     [Header("Input")]
-    [SerializeField] private KeyCode fireKey = KeyCode.Return; // Enter
+    [SerializeField] private KeyCode fireKey = KeyCode.Return; 
 
     [Header("Shoot")]
     [SerializeField] private Transform muzzle;
@@ -19,8 +19,8 @@ public class SuitWeaponController : MonoBehaviour
     [SerializeField] private Vector2 shootVolumeRange = new Vector2(0.8f, 1.0f);
 
     [Header("Facing (optional)")]
-    [SerializeField] private SpriteRenderer suitSprite; // si us�s flipX
-    [SerializeField] private bool useSpriteFlipX = true; // true si tu direcci�n depende de flipX
+    [SerializeField] private SpriteRenderer suitSprite; 
+    [SerializeField] private bool useSpriteFlipX = true; 
 
     [SerializeField] private Vector2 muzzleBaseLocalPos = new Vector2(-0.6f, 0.2f);
     [SerializeField] private bool invertFlipLogic = true;
@@ -40,7 +40,6 @@ public class SuitWeaponController : MonoBehaviour
 
     void Update()
     {
-        // No dispara si el traje está vacío
         if (suitVehicle != null && suitVehicle.state != SuitVehicle.SuitState.Occupied)
             return;
 
@@ -73,9 +72,8 @@ public class SuitWeaponController : MonoBehaviour
 
         GameObject bulletGO = Instantiate(bulletPrefab, muzzle.position, Quaternion.identity);
 
-        // ignorar colisión bala vs traje
         var bulletCol = bulletGO.GetComponent<Collider2D>();
-        var suitCol = GetComponent<Collider2D>(); // o el collider principal del traje
+        var suitCol = GetComponent<Collider2D>(); 
 
         if (bulletCol != null && suitCol != null)
             Physics2D.IgnoreCollision(bulletCol, suitCol, true);
@@ -92,8 +90,7 @@ public class SuitWeaponController : MonoBehaviour
             rb.linearVelocity = dir * bulletSpeed;
         }
 
-        // Rotaci�n visual opcional del sprite (solo si quer�s que apunte)
-        // bulletGO.transform.right = dir;
+        bulletGO.transform.right = dir;
 
         PlayShootSfx();
     }

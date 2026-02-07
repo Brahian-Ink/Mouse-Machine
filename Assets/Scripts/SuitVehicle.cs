@@ -9,12 +9,15 @@ public class SuitVehicle : MonoBehaviour
 
     [Header("Refs")]
     [SerializeField] private Animator anim;
-    [SerializeField] private MonoBehaviour suitMovementScript; // tu script actual de movimiento del traje
-    [SerializeField] private Transform ejectPoint;            // punto en el casco
+    [SerializeField] private MonoBehaviour suitMovementScript; 
+    [SerializeField] private Transform ejectPoint;            
+    [SerializeField] private CameraFollowBounds2D cameraFollow; 
+    [SerializeField] private Transform suitCameraTarget;        
+    [SerializeField] private Transform ratCameraTarget;        
 
     [Header("Interact")]
     [SerializeField] private KeyCode interactKey = KeyCode.E;
-    [SerializeField] private GameObject promptUI;             // "E Entrar"
+    [SerializeField] private GameObject promptUI;             
     [SerializeField] private float ejectForceX = 4f;
     [SerializeField] private float ejectForceY = 7f;
 
@@ -29,13 +32,21 @@ public class SuitVehicle : MonoBehaviour
     [SerializeField] private Vector2 pitchRange = new Vector2(0.95f, 1.05f);
     [SerializeField] private Vector2 volumeRange = new Vector2(0.8f, 1.0f);
 
+    [Header("Physics Materials")]
+    [SerializeField] private Collider2D suitCollider;              
+    [SerializeField] private PhysicsMaterial2D frictionMaterial;   
+    [SerializeField] private PhysicsMaterial2D noFrictionMaterial; 
+
+    private PhysicsMaterial2D originalMaterial;
+
     private GameObject ratInRange;
 
     void Awake()
     {
         if (anim == null) anim = GetComponent<Animator>();
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
-
+        if (suitCollider == null) suitCollider = GetComponent<Collider2D>();
+        if (suitCollider != null) originalMaterial = suitCollider.sharedMaterial;
         ApplyState(state);
 
         if (promptUI != null)
@@ -67,10 +78,9 @@ public class SuitVehicle : MonoBehaviour
 
     void EnterSuit(GameObject rat)
     {
-        // apagar rata
         rat.SetActive(false);
+        ApplySuitMaterial(true);
 
-        // limpiar prompt/rango para evitar parpadeos
         ratInRange = null;
         if (promptUI != null) promptUI.SetActive(false);
 
@@ -78,36 +88,41 @@ public class SuitVehicle : MonoBehaviour
 
         state = SuitState.Occupied;
         ApplyState(state);
+
+        if (cameraFollow != null)
+            cameraFollow.SetTarget(suitCameraTarget != null ? suitCameraTarget : transform);
+
     }
 
     void ExitSuit()
     {
         PlayExitSound();
-
-        // bloquear reentrada un rato
+        
         blockEnterUntil = Time.time + reenterBlockTime;
 
-        // buscar la rata aunque esté inactiva
         var rat = FindFirstObjectByType<RatController>(FindObjectsInactive.Include);
         if (rat != null)
         {
             var ratGO = rat.gameObject;
 
-            // respawn en el casco (o donde definas)
             ratGO.transform.position = ejectPoint != null ? ejectPoint.position : transform.position;
             ratGO.SetActive(true);
 
-            // expulsión
             var rb = ratGO.GetComponent<Rigidbody2D>();
             if (rb != null)
             {
-                float dir = transform.localScale.x >= 0 ? 1f : -1f; // si usás flipX, adaptalo
+                float dir = transform.localScale.x >= 0 ? 1f : -1f; 
                 rb.linearVelocity = new Vector2(dir * ejectForceX, ejectForceY);
             }
         }
 
         state = SuitState.Empty;
         ApplyState(state);
+        if (cameraFollow != null && ratCameraTarget != null)
+            cameraFollow.SetTarget(ratCameraTarget);
+
+        ApplySuitMaterial(false);
+
     }
 
     void ApplyState(SuitState s)
@@ -118,7 +133,7 @@ public class SuitVehicle : MonoBehaviour
             anim.SetBool("Occupied", occupied);
 
         if (suitMovementScript != null)
-            suitMovementScript.enabled = occupied; // Empty => no recibe input, queda standby
+            suitMovementScript.enabled = occupied; 
     }
 
     void OnTriggerEnter2D(Collider2D other)
@@ -153,5 +168,19 @@ public class SuitVehicle : MonoBehaviour
         AudioClip clip = exitSuitClips[Random.Range(0, exitSuitClips.Length)];
         audioSource.pitch = Random.Range(pitchRange.x, pitchRange.y);
         audioSource.PlayOneShot(clip, Random.Range(volumeRange.x, volumeRange.y));
+    }
+    private void ApplySuitMaterial(bool occupied)
+    {
+        if (suitCollider == null) return;
+
+        
+        suitCollider.sharedMaterial = occupied ? noFrictionMaterial : frictionMaterial;
+
+       
+        var rb = suitCollider.attachedRigidbody;
+        if (rb != null)
+        {
+            rb.sharedMaterial = null; 
+        }
     }
 }
