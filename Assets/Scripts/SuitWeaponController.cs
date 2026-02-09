@@ -3,7 +3,7 @@ using UnityEngine;
 public class SuitWeaponController : MonoBehaviour
 {
     [Header("Input")]
-    [SerializeField] private KeyCode fireKey = KeyCode.Return; 
+    [SerializeField] private KeyCode fireKey = KeyCode.Return;
 
     [Header("Shoot")]
     [SerializeField] private Transform muzzle;
@@ -19,27 +19,26 @@ public class SuitWeaponController : MonoBehaviour
     [SerializeField] private Vector2 shootVolumeRange = new Vector2(0.8f, 1.0f);
 
     [Header("Facing (optional)")]
-    [SerializeField] private SpriteRenderer suitSprite; 
-    [SerializeField] private bool useSpriteFlipX = true; 
+    [SerializeField] private SpriteRenderer suitSprite;
+    [SerializeField] private bool useSpriteFlipX = true;
 
     [SerializeField] private Vector2 muzzleBaseLocalPos = new Vector2(-0.6f, 0.2f);
+
+    // Si tu flipX está invertido respecto a izquierda/derecha, activá esto.
     [SerializeField] private bool invertFlipLogic = true;
 
-
-
-    float nextFireTime;
+    private float nextFireTime;
 
     void Awake()
     {
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
         if (suitSprite == null) suitSprite = GetComponentInChildren<SpriteRenderer>();
-        if (suitVehicle == null)
-            suitVehicle = GetComponent<SuitVehicle>();
-
+        if (suitVehicle == null) suitVehicle = GetComponent<SuitVehicle>();
     }
 
     void Update()
     {
+        // Solo dispara si el traje está ocupado.
         if (suitVehicle != null && suitVehicle.state != SuitVehicle.SuitState.Occupied)
             return;
 
@@ -56,10 +55,14 @@ public class SuitWeaponController : MonoBehaviour
     {
         if (muzzle == null || suitSprite == null) return;
 
+        // Mantiene el muzzle del lado correcto según el facing real.
+        // Se usa la misma lógica del facing que se usa para la dirección de disparo.
         Vector2 pos = muzzleBaseLocalPos;
 
-        if (!suitSprite.flipX)
-            pos.x = -muzzleBaseLocalPos.x;
+        bool isFacingLeft = suitSprite.flipX;
+        if (invertFlipLogic) isFacingLeft = !isFacingLeft;
+
+        pos.x = Mathf.Abs(muzzleBaseLocalPos.x) * (isFacingLeft ? -1f : 1f);
 
         muzzle.localPosition = pos;
     }
@@ -72,8 +75,9 @@ public class SuitWeaponController : MonoBehaviour
 
         GameObject bulletGO = Instantiate(bulletPrefab, muzzle.position, Quaternion.identity);
 
+        // Evita que la bala choque con el suit que la dispara.
         var bulletCol = bulletGO.GetComponent<Collider2D>();
-        var suitCol = GetComponent<Collider2D>(); 
+        var suitCol = GetComponent<Collider2D>();
 
         if (bulletCol != null && suitCol != null)
             Physics2D.IgnoreCollision(bulletCol, suitCol, true);
@@ -84,12 +88,12 @@ public class SuitWeaponController : MonoBehaviour
                 Physics2D.IgnoreCollision(bulletCol, col, true);
         }
 
+        // Velocidad de bala.
         var rb = bulletGO.GetComponent<Rigidbody2D>();
         if (rb != null)
-        {
             rb.linearVelocity = dir * bulletSpeed;
-        }
 
+        // Orientación visual de la bala, si el sprite usa el eje right.
         bulletGO.transform.right = dir;
 
         PlayShootSfx();
@@ -97,6 +101,7 @@ public class SuitWeaponController : MonoBehaviour
 
     Vector2 GetFacingDir()
     {
+        // Si se usa flipX del sprite como fuente de facing, se respeta invertFlipLogic.
         if (useSpriteFlipX && suitSprite != null)
         {
             bool isFacingLeft = suitSprite.flipX;
@@ -105,6 +110,7 @@ public class SuitWeaponController : MonoBehaviour
             return isFacingLeft ? Vector2.left : Vector2.right;
         }
 
+        // Fallback: usa la escala global.
         float sx = transform.lossyScale.x;
         return sx < 0 ? Vector2.left : Vector2.right;
     }

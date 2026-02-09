@@ -6,6 +6,8 @@ TagManager:
   tags:
   - Rat
   - Wall
+  - Suit
+  - BulletPlayer
   layers:
   - Default
   - TransparentFX
@@ -16,7 +18,7 @@ TagManager:
   - Ground
   - Suit
   - Wall
-  - 
+  - Enemy
   - 
   - 
   - 

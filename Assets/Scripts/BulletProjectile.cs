@@ -5,9 +5,12 @@ public class BulletProjectile : MonoBehaviour
     [Header("Life")]
     [SerializeField] private float lifeTime = 2.0f;
 
+    [Header("Damage")]
+    [SerializeField] private int damage = 1;
+
     [Header("Impact")]
-    [SerializeField] private LayerMask hitMask = ~0; // todo
-    [SerializeField] private bool destroyOnTrigger = true;
+    [SerializeField] private LayerMask hitMask = ~0;
+    [SerializeField] private bool destroyOnHit = true;
 
     [Header("Audio")]
     [SerializeField] private AudioClip[] impactClips;
@@ -17,11 +20,13 @@ public class BulletProjectile : MonoBehaviour
     [Header("Optional VFX")]
     [SerializeField] private GameObject impactVfxPrefab;
 
-    float deathTime;
+    private float deathTime;
+    private bool hasHit;
 
     void OnEnable()
     {
         deathTime = Time.time + lifeTime;
+        hasHit = false;
     }
 
     void Update()
@@ -32,23 +37,48 @@ public class BulletProjectile : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        // filtrar por layer
+        if (hasHit) return;
         if (((1 << other.gameObject.layer) & hitMask) == 0) return;
 
-        // Evitar que choque con triggers de UI o cosas raras: si querés, filtralo por tag/layer
-        Impact(other.ClosestPoint(transform.position));
+        // Si chocás con triggers “decorativos” (por ejemplo zonas) esto evita impactos falsos.
+        // Dejalo si lo necesitás; si no, podés sacarlo.
+        if (other.isTrigger && other.GetComponent<EnemyHealth>() == null && other.GetComponentInParent<EnemyHealth>() == null)
+            return;
 
-        if (destroyOnTrigger)
+        ProcessHit(other, other.ClosestPoint(transform.position));
+    }
+
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (hasHit) return;
+        if (((1 << collision.gameObject.layer) & hitMask) == 0) return;
+
+        var other = collision.collider;
+        Vector2 point = collision.GetContact(0).point;
+
+        ProcessHit(other, point);
+    }
+
+    private void ProcessHit(Collider2D other, Vector2 point)
+    {
+        hasHit = true;
+
+        // Aplicar daño si es enemigo (sirve aunque el collider esté en un hijo)
+        var eh = other.GetComponent<EnemyHealth>();
+        if (eh == null) eh = other.GetComponentInParent<EnemyHealth>();
+        if (eh != null) eh.TakeHit(damage);
+
+        Impact(point);
+
+        if (destroyOnHit)
             Destroy(gameObject);
     }
 
     void Impact(Vector2 point)
     {
-        // VFX
         if (impactVfxPrefab != null)
             Instantiate(impactVfxPrefab, point, Quaternion.identity);
 
-        // SFX: se reproduce aunque la bala se destruya
         PlayImpactSfx(point);
     }
 
@@ -60,8 +90,16 @@ public class BulletProjectile : MonoBehaviour
         float pitch = Random.Range(impactPitchRange.x, impactPitchRange.y);
         float vol = Random.Range(impactVolumeRange.x, impactVolumeRange.y);
 
-        // Audio “one shot” en el mundo
-        AudioSource.PlayClipAtPoint(clip, worldPos, vol);
-        // Nota: PlayClipAtPoint crea un GO temporal. Para jam está perfecto.
+        var go = new GameObject("ImpactSfxTemp");
+        go.transform.position = worldPos;
+
+        var src = go.AddComponent<AudioSource>();
+        src.clip = clip;
+        src.pitch = pitch;
+        src.volume = vol;
+        src.spatialBlend = 0f;
+        src.Play();
+
+        Destroy(go, clip.length / Mathf.Max(0.01f, pitch));
     }
 }
