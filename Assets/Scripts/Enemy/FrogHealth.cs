@@ -1,14 +1,14 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
-public class PlayerHealth : MonoBehaviour
+public class FrogHealth : MonoBehaviour
 {
     [Header("Health")]
-    [SerializeField] private int maxHp = 3;
+    [SerializeField] private int maxHp = 1;
 
     [Header("Invulnerability")]
-    [SerializeField] private float iFrames = 0.6f;
+    [Tooltip("Si querés invulnerable solo mientras parpadea, dejá esto en 0.")]
+    [SerializeField] private float extraInvulnTime = 0f; // extra opcional
 
     [Header("Flash")]
     [SerializeField] private bool usePropertyBlockFlash = true;
@@ -18,7 +18,14 @@ public class PlayerHealth : MonoBehaviour
     [SerializeField] private float flashInterval = 0.06f;
 
     [Header("Death")]
-    [SerializeField] private float reloadDelay = 0.15f;
+    [SerializeField] private GameObject deathVfxPrefab;
+
+    [Header("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip[] hitClips;
+    [SerializeField] private AudioClip[] deathClips;
+    [SerializeField] private Vector2 pitchRange = new Vector2(0.95f, 1.05f);
+    [SerializeField] private Vector2 volumeRange = new Vector2(0.8f, 1.0f);
 
     private int hp;
     private bool dead;
@@ -30,17 +37,19 @@ public class PlayerHealth : MonoBehaviour
     private Coroutine flashRoutine;
 
     public bool Dead => dead;
+    public bool CanBeHit() => !dead && Time.time >= invulnUntil;
 
     void Awake()
     {
-        maxHp = Mathf.Max(1, maxHp);
-        hp = maxHp;
-
+        hp = Mathf.Max(1, maxHp);
         srs = GetComponentsInChildren<SpriteRenderer>(true);
         mpb = new MaterialPropertyBlock();
+
+        if (!audioSource)
+            audioSource = GetComponent<AudioSource>();
     }
 
-    public void TakeDamage(int dmg = 1)
+    public void TakeHit(int dmg = 1)
     {
         if (dead) return;
         if (Time.time < invulnUntil) return;
@@ -48,24 +57,40 @@ public class PlayerHealth : MonoBehaviour
         dmg = Mathf.Max(1, dmg);
         hp -= dmg;
 
-        invulnUntil = Time.time + iFrames;
+        PlayOneShot(hitClips);
+
+        // Invuln = duración total del flash (mientras parpadea) + extra opcional
+        float flashTotal = flashTimes * flashInterval * 2f;
+        invulnUntil = Time.time + flashTotal + Mathf.Max(0f, extraInvulnTime);
 
         if (flashRoutine != null) StopCoroutine(flashRoutine);
         flashRoutine = StartCoroutine(FlashRoutine());
 
         if (hp <= 0)
-        {
-            hp = 0;
-            dead = true;
-            Debug.Log("MURIO");
-            StartCoroutine(ReloadRoom());
-        }
+            Die();
     }
 
-    private IEnumerator ReloadRoom()
+    public void Die()
     {
-        yield return new WaitForSeconds(reloadDelay);
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        if (dead) return;
+        dead = true;
+
+        PlayOneShot(deathClips);
+
+        if (deathVfxPrefab != null)
+            Instantiate(deathVfxPrefab, transform.position, Quaternion.identity);
+
+        Destroy(gameObject, 0.05f);
+    }
+
+    private void PlayOneShot(AudioClip[] clips)
+    {
+        if (!audioSource) return;
+        if (clips == null || clips.Length == 0) return;
+
+        var clip = clips[Random.Range(0, clips.Length)];
+        audioSource.pitch = Random.Range(pitchRange.x, pitchRange.y);
+        audioSource.PlayOneShot(clip, Random.Range(volumeRange.x, volumeRange.y));
     }
 
     private IEnumerator FlashRoutine()
@@ -119,10 +144,8 @@ public class PlayerHealth : MonoBehaviour
             var sr = srs[i];
             if (!sr) continue;
 
-            if (usePropertyBlockFlash)
-                sr.SetPropertyBlock(null);
-            else
-                sr.color = original[i];
+            if (usePropertyBlockFlash) sr.SetPropertyBlock(null);
+            else sr.color = original[i];
         }
     }
 }

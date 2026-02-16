@@ -40,9 +40,10 @@ public class BulletProjectile : MonoBehaviour
         if (hasHit) return;
         if (((1 << other.gameObject.layer) & hitMask) == 0) return;
 
-        // Si chocás con triggers “decorativos” (por ejemplo zonas) esto evita impactos falsos.
-        // Dejalo si lo necesitás; si no, podés sacarlo.
-        if (other.isTrigger && other.GetComponent<EnemyHealth>() == null && other.GetComponentInParent<EnemyHealth>() == null)
+        // Evita impactos falsos con triggers decorativos
+        if (other.isTrigger &&
+            other.GetComponent<EnemyHealth>() == null && other.GetComponentInParent<EnemyHealth>() == null &&
+            other.GetComponent<FrogHealth>() == null && other.GetComponentInParent<FrogHealth>() == null)
             return;
 
         ProcessHit(other, other.ClosestPoint(transform.position));
@@ -63,10 +64,15 @@ public class BulletProjectile : MonoBehaviour
     {
         hasHit = true;
 
-        // Aplicar daño si es enemigo (sirve aunque el collider esté en un hijo)
+        // Daño a EnemyHealth (enemigos generales)
         var eh = other.GetComponent<EnemyHealth>();
         if (eh == null) eh = other.GetComponentInParent<EnemyHealth>();
         if (eh != null) eh.TakeHit(damage);
+
+        // Daño a FrogHealth (rana)
+        var fh = other.GetComponent<FrogHealth>();
+        if (fh == null) fh = other.GetComponentInParent<FrogHealth>();
+        if (fh != null) fh.TakeHit(damage);
 
         Impact(point);
 
